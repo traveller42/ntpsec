@@ -747,13 +747,54 @@ void intercept_sendpkt(const char *legend,
 ssize_t intercept_recvfrom(int sockfd, void *buf, size_t len, int flags,
                         struct sockaddr *src_addr, socklen_t *addrlen)
 {
-    return recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+    char pkt_dump[BUFSIZ];
+    ssize_t recvlen;
+
+    if (mode == replay)
+    {
+	get_operation("recvfrom ");
+	/* FIXME: replay implementation here */
+    } else {
+	char *cp;
+	snprintf(pkt_dump, sizeof(pkt_dump),
+		 "recvfrom %d %0x %s",
+		 sockfd, flags, socktoa((sockaddr_u *)src_addr));
+	for (cp = (char *)buf; cp < (char *)buf + len; cp++)
+	    snprintf(pkt_dump + strlen(pkt_dump),
+		     sizeof(pkt_dump) - strlen(pkt_dump),
+		     "%0x", *cp);
+	strlcat(pkt_dump, "\n", sizeof(pkt_dump));
+    
+	recvlen = recvfrom(sockfd, buf, len, flags, src_addr, addrlen);
+
+	if (mode == capture)
+	    fputs(pkt_dump, stdout);
+    }
+
+    return recvlen;
 }
 
 SOCKET intercept_open_socket(sockaddr_u *addr,
 			     int bcast, int turn_off_reuse, endpt *interface)
 {
-    return open_socket(addr, bcast, turn_off_reuse, interface);
+    char open_dump[BUFSIZ];
+    int sock;
+
+    if (mode == replay)
+    {
+	get_operation("open_socket ");
+	/* FIXME: replay implementation here */
+    } else {
+	snprintf(open_dump, sizeof(open_dump),
+		 "open_socket %s %d %d %s\n",
+		 socktoa(addr), bcast, turn_off_reuse, interface->name);
+
+	sock = open_socket(addr, bcast, turn_off_reuse, interface);
+
+	if (mode == capture)
+	    fputs(open_dump, stdout);
+    }
+    return sock;
 }
 
 void intercept_replay(void)
